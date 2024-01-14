@@ -13,11 +13,13 @@ const gameFrameRate = 60;
 let engine;
 let fuelConsuptionRate;
 let uber;
-let uberImage, uberLandingImage, uberFlameGif;
+let uberImage, uberLandingImage, uberFlameGif, uberBoomImage;
 let platformUberDetector;
 let platforms = [];
-let ground;
+let crash = false;
+let explosionTimer = 0;
 
+let frames;
 let scaleX;
 let scaleY;
 
@@ -81,6 +83,8 @@ class Uber {
         imageMode(CENTER);
         if (this.facingRight) scale(-1, 1);
         image(this.landingMode ? uberLandingImage : uberImage, 0, 0, this.w * scaleX, this.h * scaleY);
+        if (crash)
+            image(uberBoomImage, 0, 0, 210 * scaleX, 110 * scaleY);
         if (this.movingUp) image(uberFlameGif, 0, ((this.h) / 2 - 10) * scaleY, 30 * scaleX, 40 * scaleY);
         if (this.movingDown) {
             scale(1, -1);
@@ -89,7 +93,7 @@ class Uber {
         }
         if (this.movingForward) {
             rotate(3 * PI / 2);
-            image(uberFlameGif, 10 * scaleY, (this.w / 2 + 20) * scaleX, 30 * scaleX, 40 * scaleY);
+            image(uberFlameGif, 10 * scaleY, (this.w / 2 + 18) * scaleX, 30 * scaleX, 40 * scaleY);
         }
 
         pop();
@@ -138,6 +142,8 @@ class Platform {
             landingUber.body.position.y < this.body.position.y - this.h / 2 - landingUber.h
             ) {
             console.log("CRASH");
+            crash = true;
+            explosionTimer = 1;
         } else if (this.num === 0 && landingUber.body.speed < 0.1) {
             if (landingUber.fuel < 100) landingUber.fuel += 100 / 3 / gameFrameRate;
             if (landingUber.fuel > 100) landingUber.fuel = 100;
@@ -146,6 +152,7 @@ class Platform {
 }
 
 function preload() {
+    uberBoomImage = loadImage("img/uberBoom.gif");
     uberImage = loadImage("img/uber.png");
     uberLandingImage = loadImage("img/uberLanding.png");
     uberFlameGif = loadImage("img/flame.gif");
@@ -169,30 +176,35 @@ function setup() {
     Composite.add(engine.world, uber.body);
 
     platformUberDetector = new Matter.Detector.create();
-    let detectorBodies = [uber.body];
-    platforms.forEach((item) => {
-        detectorBodies.push(item.body);
-    })
-    Matter.Detector.setBodies(platformUberDetector, detectorBodies);
+    Matter.Detector.setBodies(platformUberDetector, Matter.Composite.allBodies(engine.world));
 }
  
 /* Funkce pro vykreslení plátna */
 function draw() {
-    Engine.update(engine, 1000 / gameFrameRate);
-
-    let collisions = Matter.Detector.collisions(platformUberDetector);
-
-    collisions.forEach((collision, idx, arr) => {
-        let colPlatformId = collision.bodyA === uber.body ? collision.bodyB.id : collision.bodyA.id;
+    if (!crash) {
+        Engine.update(engine, 1000 / gameFrameRate);
         
-        platforms.forEach((platform) => {
-            //console.log(.id);
+        let collisions = Matter.Detector.collisions(platformUberDetector);
 
-            if (platform.id !== colPlatformId) return;
+        collisions.forEach((collision, idx, arr) => {
+            let colPlatformId = collision.bodyA === uber.body ? collision.bodyB.id : collision.bodyA.id;
             
-            platform.land(uber);
-        })
-    });
+            platforms.forEach((platform) => {
+                //console.log(.id);
+
+                if (platform.id !== colPlatformId) return;
+                
+                platform.land(uber);
+            })
+        });
+    } else {
+        explosionTimer -= (1 / gameFrameRate);
+
+        if (explosionTimer <= 0) {
+            restartLeverl();
+            crash = false;
+        }
+    }
     
     background(0);
     
@@ -229,14 +241,30 @@ function statusBar() {
     text(`Fuel: ${ceil(uber.fuel)}`, 250, height - 15);
     /* Čas hry v sekundách a setinách sekundy */
     text(`Time: ${round(millis()/1000)}.${round(millis() % 100)}`, 850, height - 15);
-  }
+}
+
+function restartLeverl() {
+    Matter.Composite.remove(engine.world, uber.body);
+
+    uber = spawnUber();
+
+    Matter.Composite.add(engine.world, uber.body);
+    Matter.Detector.setBodies(platformUberDetector, Matter.Composite.allBodies(engine.world));
+}
+
+function addPlatformsToEngine(arr) {
+    arr.forEach((platform) => {
+        Composite.add(engine.world, platform.body);
+    })
+}
 
 function randomPlatforms(count, fuel = true) {
      for (let i = fuel ? 0 : 1; i < count + 1; i++) {
         let platform = new Platform(round(random(worldWidth - 400) + 200), round(random(worldHeight - 400) + 275), i)
         platforms.push(platform);
-        Composite.add(engine.world, platform.body);
      }
+
+     addPlatformsToEngine(platforms);
 }
 
 function spawnUber(platform = random(platforms)) {
