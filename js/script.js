@@ -15,11 +15,14 @@ let fuelConsuptionRate;
 let uber;
 let uberImage, uberLandingImage, uberFlameGif, uberBoomImage;
 let platformUberDetector;
-let platforms = [];
+let platforms = [], fuelPlatforms = [];
 let crash = false;
 let explosionTimer = 0;
+let destination = -1;
+let passangers = 0;
+let score = 0;
 
-let frames;
+let frames = 0;
 let scaleX;
 let scaleY;
 
@@ -41,6 +44,23 @@ class Uber {
         });
         this.id = this.body.id;
         this.lastVelocity = Matter.Body.getVelocity(this.body);
+    }
+
+    switchMode() {
+        this.landingMode = !this.landingMode;
+
+        let vertices = this.body.vertices;
+
+        if (this.landingMode) {
+            vertices[2].y += 30;
+            vertices[3].y += 30;
+        } else {
+            vertices[2].y -= 30;
+            vertices[3].y -= 30;
+        }
+
+        Matter.Body.setVertices(this.body, vertices);
+        console.log(this.body);
     }
 
     input() {
@@ -105,6 +125,8 @@ class Platform {
         this.num = number;
         this.w = 400;
         this.h = 110;
+        this.landingFrame = -1;
+        this.passangerReady = false;
         this.body = Bodies.rectangle(posX, posY, this.w, this.h, { 
             isStatic: true,
             collisionFilter: {
@@ -130,6 +152,11 @@ class Platform {
         } else {
             text(`${this.num}`, this.body.position.x * scaleX, this.body.position.y * scaleY);
         }
+
+        if (this.passangerReady && this.landingFrame == -1) {
+            fill(color(255, 255, 0));
+            rect((this.body.position.x - 80) * scaleX, (this.body.position.y - this.h / 2 - 70) * scaleY, 70 * scaleX, 140 * scaleY);
+        }
         //console.log(this.body);
     }
 
@@ -147,6 +174,25 @@ class Platform {
         } else if (this.num === 0 && landingUber.body.speed < 0.1) {
             if (landingUber.fuel < 100) landingUber.fuel += 100 / 3 / gameFrameRate;
             if (landingUber.fuel > 100) landingUber.fuel = 100;
+        } else if (this.passangerReady && destination === -1) {
+            if (this.landingFrame === -1) this.landingFrame = frames;
+            else if (frames - this.landingFrame >= gameFrameRate * 2) {
+                this.passangerReady = false;
+                passangers--;
+                let newDest = -1;
+                while (newDest === -1) {
+                    newDest = random(platforms).num;
+                    if (newDest === this.num) newDest = -1
+                }
+                destination = newDest;
+
+                this.landingFrame = -1;
+            }
+        } else if (destination === this.num) {
+            destination = -1;
+            score += 10;
+            
+            if (passangers < 1) newPassanger();
         }
     }
 }
@@ -177,13 +223,21 @@ function setup() {
 
     platformUberDetector = new Matter.Detector.create();
     Matter.Detector.setBodies(platformUberDetector, Matter.Composite.allBodies(engine.world));
+
+    newPassanger();
 }
  
 /* Funkce pro vykreslení plátna */
 function draw() {
+    frames++;
+
     if (!crash) {
         Engine.update(engine, 1000 / gameFrameRate);
         
+        if (passangers < 2 && frames % (gameFrameRate * 10) == 0) {
+            newPassanger();
+        }
+
         let collisions = Matter.Detector.collisions(platformUberDetector);
 
         collisions.forEach((collision, idx, arr) => {
@@ -211,15 +265,20 @@ function draw() {
     platforms.forEach((item) => {
         item.draw();
     });
+
+    fuelPlatforms.forEach((item) => {
+        item.draw();
+    });
+
     uber.draw();
 
     statusBar();
-    //console.log(uber.body.speed);
+    //console.log(uber.body);
 }
 
 function keyPressed() {
     if (keyCode === 32)
-        uber.landingMode = !uber.landingMode;
+        uber.switchMode();
 }
 
 function statusBar() {
@@ -241,6 +300,14 @@ function statusBar() {
     text(`Fuel: ${ceil(uber.fuel)}`, 250, height - 15);
     /* Čas hry v sekundách a setinách sekundy */
     text(`Time: ${round(millis()/1000)}.${round(millis() % 100)}`, 850, height - 15);
+
+    if (destination !== -1) {
+        text(`Next: platform ${destination}`, 450, height - 15);
+    } else {
+        text(`Next: pickup passanger`, 450, height - 15);
+    }
+
+    text(`Score: ${score}`, 50, height - 15);
 }
 
 function restartLeverl() {
@@ -252,24 +319,33 @@ function restartLeverl() {
     Matter.Detector.setBodies(platformUberDetector, Matter.Composite.allBodies(engine.world));
 }
 
-function addPlatformsToEngine(arr) {
-    arr.forEach((platform) => {
-        Composite.add(engine.world, platform.body);
-    })
+function addToEngine(newObject) {
+    if (Array.isArray(newObject)) {
+        newObject.forEach((platform) => {
+            Composite.add(engine.world, platform.body);
+        })
+    } else {
+        Composite.add(engine.world, newObject);
+    }
 }
 
 function randomPlatforms(count, fuel = true) {
      for (let i = fuel ? 0 : 1; i < count + 1; i++) {
         let platform = new Platform(round(random(worldWidth - 400) + 200), round(random(worldHeight - 400) + 275), i)
-        platforms.push(platform);
+        if (i !== 0) platforms.push(platform);
+        else fuelPlatforms.push(platform);
      }
 
-     addPlatformsToEngine(platforms);
+     addToEngine(platforms);
 }
 
 function spawnUber(platform = random(platforms)) {
-    let spawnPlatform = platform;
-    return new Uber(spawnPlatform.body.position.x, spawnPlatform.body.position.y - spawnPlatform.h / 2 - 55);
+    return new Uber(platform.body.position.x, platform.body.position.y - platform.h / 2 - 55);
+}
+
+function newPassanger() {
+    random(platforms).passangerReady = true;
+    passangers++;
 }
 
 function windowResized() {
