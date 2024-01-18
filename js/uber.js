@@ -14,27 +14,27 @@ class Uber {
             frictionAir: 0,
             frictionStatic: Infinity,
             restitution: 0.5,
-            label: "uber",
+            label: "uber"
         });
         this.id = this.body.id;
         this.lastVelocity = Matter.Body.getVelocity(this.body);
     }
 
     switchMode() {
-        this.landingMode = !this.landingMode;
+        if (!this.loadingPassenger) {
+            this.landingMode = !this.landingMode;
+            let velocity = this.body.velocity;
+            if (this.landingMode) {
+                Matter.Body.scale(this.body, 1, 110 / 80, Matter.Vector.add(this.body.position, Matter.Vector.create(0, -this.h / 2)));
+                this.h = 110;
+            } else {
+                Matter.Body.scale(this.body, 1, 80 / 110, Matter.Vector.add(this.body.position, Matter.Vector.create(0, -this.h / 2)));
+                this.h = 80;
+            }
 
-        let vertices = this.body.vertices;
-
-        if (this.landingMode) {
-            vertices[2].y += 30;
-            vertices[3].y += 30;
-        } else {
-            vertices[2].y -= 30;
-            vertices[3].y -= 30;
+            Matter.Body.setVelocity(this.body, velocity);
+            Matter.Body.setInertia(this.body, Infinity);
         }
-
-        Matter.Body.setVertices(this.body, vertices);
-        Matter.Body.setInertia(this.body, Infinity);
     }
 
     input() {
@@ -79,7 +79,7 @@ class Uber {
         image(this.landingMode ? uberLandingImage : uberImage, 0, 0, this.w * scaleX, this.h * scaleY);
         if (crash)
             image(uberBoomImage, 0, 0, 210 * scaleX, 110 * scaleY);
-        if (this.movingUp) image(uberFlameGif, 0, ((this.h) / 2 - 10) * scaleY, 30 * scaleX, 40 * scaleY);
+        if (this.movingUp) image(uberFlameGif, 0, ((this.h) / 2 + (this.landingMode ? -10 : 20)) * scaleY, 30 * scaleX, 40 * scaleY);
         if (this.movingDown) {
             scale(1, -1);
             image(uberFlameGif, 20 * scaleX, ((this.h) / 2 + 20) * scaleY, 30 * scaleX, 40 * scaleY);
@@ -87,7 +87,7 @@ class Uber {
         }
         if (this.movingForward) {
             rotate(3 * PI / 2);
-            image(uberFlameGif, 10 * scaleY, (this.w / 2 + 18) * scaleX, 30 * scaleX, 40 * scaleY);
+            image(uberFlameGif, (this.landingMode ? 15 : 0) * scaleY, (this.w / 2 + 18) * scaleX, 30 * scaleX, 40 * scaleY);
         }
 
         pop();

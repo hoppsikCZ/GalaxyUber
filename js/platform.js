@@ -19,8 +19,8 @@ class Platform {
         rectMode(CENTER);
         if (this.num === 0) fill(color(0, 255, 255));
         else fill(color(255, 255, 255));
-        rect(this.body.position.x * scaleX, this.body.position.y * scaleY, this.w * scaleX, this.h * scaleY);
         strokeWeight(0);
+        rect(this.body.position.x * scaleX, this.body.position.y * scaleY, this.w * scaleX, this.h * scaleY);
         textSize(15);
         textStyle(BOLD);
         fill(color(0));
@@ -50,7 +50,7 @@ class Platform {
         } else if (this.num === 0 && landingUber.body.speed < 0.1) {
             if (landingUber.fuel < 100) landingUber.fuel += 100 / 3 / gameFrameRate;
             if (landingUber.fuel > 100) landingUber.fuel = 100;
-        } else if (this.passengerReady && destination === -1) {
+        } else if (!nextLevelReady && this.passengerReady && destination === -1) {
             if (this.landingFrame === -1) {
                 this.landingFrame = frames;
                 landingUber.loadingPassenger = true;
@@ -69,7 +69,7 @@ class Platform {
             destination = -1;
             score += 10;
             
-            if (passengers < 1) newPassenger();
+            if (passengers < 1) newPassenger(1);
         }
     }
 }

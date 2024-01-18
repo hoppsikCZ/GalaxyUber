@@ -12,17 +12,20 @@ const gameFrameRate = 60;
 
 let engine;
 let fuelConsuptionRate;
-let backgroundBorder;
+let worldBounds;
 let uber;
 let uberImage, uberLandingImage, uberFlameGif, uberBoomImage, passengerImage;
-let platformUberDetector;
 let platforms = [];
 let crash = false;
 let loadingPassenger = false;
 let explosionTimer = 0;
 let destination = -1;
 let passengers = 0;
+let lives = 3;
 let score = 0;
+let startingScore = 0;
+let nextLevelReady = false;
+let gameEnd = false;
 
 let frames = 0;
 let scaleX;
@@ -54,11 +57,14 @@ function setup() {
 
     addObjectsBodyToEngine(uber);
 
-    //backgroundBorder = randomBorder(5);
-    //addObjectsBodyToEngine(backgroundBorder);
-
-    platformUberDetector = new Matter.Detector.create();
-    Matter.Detector.setBodies(platformUberDetector, Matter.Composite.allBodies(engine.world)/*.filter((body) =>  body.id !== backgroundBorder.body.id)*/);
+    
+    worldBounds = Matter.Bodies.rectangle(worldWidth / 2, worldHeight / 2, 7600, 4200, { 
+        isStatic: true,
+        collisionFilter: {
+            group: 0,
+            mask: 0
+        }
+    })
 
     newPassenger(2);
 }
@@ -66,15 +72,34 @@ function setup() {
 /* Funkce pro vykreslení plátna */
 function draw() {
     frames++;
-
-    if (!crash) {
+    if (gameEnd) {
+        textSize(100);
+        textStyle(BOLD);
+        fill(color(255, 0, 0));
+        text("Game Over", width / 2 - 300, height / 2 + 50, )
+        return;
+    } else if (!crash) {
         Engine.update(engine, 1000 / gameFrameRate);
 
         if (passengers < 2 && frames % (gameFrameRate * 10) === 0) {
             newPassenger(1);
         }
 
-        let collisions = Matter.Detector.collisions(platformUberDetector);
+        if(!Matter.Bounds.contains(worldBounds.bounds, uber.body.vertices[0]) ||
+        !Matter.Bounds.contains(worldBounds.bounds, uber.body.vertices[1]) ||
+        !Matter.Bounds.contains(worldBounds.bounds, uber.body.vertices[2]) ||
+        !Matter.Bounds.contains(worldBounds.bounds, uber.body.vertices[3])) {
+            if (nextLevelReady) {
+                nextLevel();
+                return;
+            } else {
+                crash = true; 
+                explosionTimer = 1;
+                return;
+            }
+        }
+
+        let collisions = Matter.Query.collides(uber.body, platforms.map((platform) => platform.body));
 
         collisions.forEach((collision, idx, arr) => {
             let colPlatformId = collision.bodyA === uber.body ? collision.bodyB.id : collision.bodyA.id;
@@ -94,16 +119,18 @@ function draw() {
             crash = false;
         }
     }
+
+    if (!nextLevelReady && score - startingScore >= 30) nextLevelReady = true;
     
     background(0);
-    
-    //backgroundBorder.draw();
+
+    drawBounds();
+
+    uber.draw();
 
     platforms.forEach((item) => {
         item.draw();
     });
-
-    uber.draw();
 
     statusBar();
 }
@@ -114,6 +141,7 @@ function keyPressed() {
 }
 
 function statusBar() {
+    rectMode(CORNER);
     /* Nastaví se poloprůhledná černá výplň */
     fill(color(0, 0, 0, 127));
     /* Vykreslí se obdélník o výšce 40 pixelů nad spodním okrajem obrazovky */
@@ -132,6 +160,7 @@ function statusBar() {
     text(`Fuel: ${ceil(uber.fuel)}`, 250, height - 15);
     /* Čas hry v sekundách a setinách sekundy */
     text(`Time: ${round(millis()/1000)}.${round(millis() % 100)}`, 850, height - 15);
+    text(`Lives: ${lives}`, 1050, height - 15);
 
     if (destination !== -1) {
         text(`Next: platform ${destination}`, 450, height - 15);
@@ -142,28 +171,55 @@ function statusBar() {
     text(`Score: ${score}`, 50, height - 15);
 }
 
-function restartLeverl() {
-    score -= 30;
+function drawBounds() {
+    if (!nextLevelReady) stroke(color(255, 0, 0));
+    else stroke(color(0, 255, 0));
+    strokeWeight(5);
+    noFill();
+    rectMode(CENTER);
+    rect(width / 2, height / 2, 7600 * scaleX, 4200 * scaleY, 10, 10, 10, 10);
+}
+
+function nextLevel() {
     passengers = 0;
+    nextLevelReady = false;
+    if (!uber.landingMode) uber.switchMode();
+    destination = -1;
+    startingScore = score;
+    uber.lastVelocity = Matter.Vector.create(0, 0);
+    Matter.Engine.clear(engine);
+    Matter.Composite.clear(engine.world, true);
+    engine = Engine.create();
+    engine.gravity.scale = 0.0002;
+    platforms = [];
+    randomPlatforms(5);
+    spawnUber(random(platforms.filter((element) => element.num !== 0)), false);
+    newPassenger(2);
+    addObjectsBodyToEngine(uber);
+    addObjectsBodyToEngine(platforms);
+}
+
+function restartLeverl() {
+    lives--;
+    if (lives <= 0) gameEnd = true;
+    passengers = 0;
+    destination = -1;
     Matter.Composite.remove(engine.world, uber.body);
 
     uber = randomSpawnUber();
 
     platforms.forEach((platform) => {
         platform.passengerReady = false;
-        platform.explosionTimer = -1;
+        platform.landingFrame = -1;
     });
 
     newPassenger(2);
     addObjectsBodyToEngine(uber);
-    Matter.Detector.setBodies(platformUberDetector, Matter.Composite.allBodies(engine.world));
 }
 
 function addObjectsBodyToEngine(newObject) {
     if (Array.isArray(newObject)) {
-        newObject.forEach((platform) => {
-            Composite.add(engine.world, platform.body);
-        })
+        Composite.add(engine.world, newObject.map((element) => element.body));
     } else {
         Composite.add(engine.world, newObject.body);
     }
@@ -171,20 +227,9 @@ function addObjectsBodyToEngine(newObject) {
 
 function randomPlatforms(count, fuel = true) {
     for (let i = fuel ? 0 : 1; i < count + 1; i++) {
-    let platform = new Platform(round(random(worldWidth - 400) + 200), round(random(worldHeight - 400) + 275), i);
-    platforms.push(platform);
+        let platform = new Platform(round(random(worldWidth - 800) + 400), round(random(worldHeight - 800) + 400), i);
+        platforms.push(platform);
     }
-}
-
-function randomBorder(verticesCount) {
-    let vertices = [];
-    let resultBorder = new BacgroundBorder(Matter.Bodies.rectangle(worldWidth / 2, worldHeight / 2, 500, 500, {isStatic: true}));
-    for (let i = 0; i < verticesCount; i++) {
-        vertices.push(Matter.Vector.create(round(random(worldWidth)), round(random(worldHeight))));
-    }
-
-    Matter.Body.setVertices(resultBorder.body, Matter.Vertices.clockwiseSort(Matter.Vertices.create(vertices, resultBorder.body)));
-    return resultBorder;
 }
 
 function randomSpawnUber() {
@@ -194,8 +239,12 @@ function randomSpawnUber() {
     return spawnUber(platform);
 }
 
-function spawnUber(platform) {
-    return new Uber(platform.body.position.x, platform.body.position.y - platform.h / 2 - 55);
+function spawnUber(platform, newOne = true) {
+    if (newOne) return new Uber(platform.body.position.x, platform.body.position.y - platform.h / 2 - 55);
+    
+    Matter.Body.setVelocity(uber.body, Matter.Vector.create(0, 0));
+    Matter.Body.setPosition(uber.body, Matter.Vector.add(platform.body.position, Matter.Vector.create(0, -platform.h / 2 - 55)));
+    return 1;
 }
 
 function newPassenger(count) {
