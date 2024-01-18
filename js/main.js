@@ -12,8 +12,9 @@ const gameFrameRate = 60;
 
 let engine;
 let fuelConsuptionRate;
+let backgroundBorder;
 let uber;
-let uberImage, uberLandingImage, uberFlameGif, uberBoomImage;
+let uberImage, uberLandingImage, uberFlameGif, uberBoomImage, passengerImage;
 let platformUberDetector;
 let platforms = [];
 let crash = false;
@@ -28,6 +29,7 @@ let scaleX;
 let scaleY;
 
 function preload() {
+    passengerImage = loadImage("img/passenger.gif");
     uberBoomImage = loadImage("img/uberBoom.gif");
     uberImage = loadImage("img/uber.png");
     uberLandingImage = loadImage("img/uberLanding.png");
@@ -52,12 +54,15 @@ function setup() {
 
     addObjectsBodyToEngine(uber);
 
+    //backgroundBorder = randomBorder(5);
+    //addObjectsBodyToEngine(backgroundBorder);
+
     platformUberDetector = new Matter.Detector.create();
-    Matter.Detector.setBodies(platformUberDetector, Matter.Composite.allBodies(engine.world));
+    Matter.Detector.setBodies(platformUberDetector, Matter.Composite.allBodies(engine.world)/*.filter((body) =>  body.id !== backgroundBorder.body.id)*/);
 
     newPassenger(2);
 }
- 
+
 /* Funkce pro vykreslení plátna */
 function draw() {
     frames++;
@@ -92,6 +97,8 @@ function draw() {
     
     background(0);
     
+    //backgroundBorder.draw();
+
     platforms.forEach((item) => {
         item.draw();
     });
@@ -163,10 +170,21 @@ function addObjectsBodyToEngine(newObject) {
 }
 
 function randomPlatforms(count, fuel = true) {
-     for (let i = fuel ? 0 : 1; i < count + 1; i++) {
-        let platform = new Platform(round(random(worldWidth - 400) + 200), round(random(worldHeight - 400) + 275), i);
-        platforms.push(platform);
-     }
+    for (let i = fuel ? 0 : 1; i < count + 1; i++) {
+    let platform = new Platform(round(random(worldWidth - 400) + 200), round(random(worldHeight - 400) + 275), i);
+    platforms.push(platform);
+    }
+}
+
+function randomBorder(verticesCount) {
+    let vertices = [];
+    let resultBorder = new BacgroundBorder(Matter.Bodies.rectangle(worldWidth / 2, worldHeight / 2, 500, 500, {isStatic: true}));
+    for (let i = 0; i < verticesCount; i++) {
+        vertices.push(Matter.Vector.create(round(random(worldWidth)), round(random(worldHeight))));
+    }
+
+    Matter.Body.setVertices(resultBorder.body, Matter.Vertices.clockwiseSort(Matter.Vertices.create(vertices, resultBorder.body)));
+    return resultBorder;
 }
 
 function randomSpawnUber() {
@@ -194,4 +212,4 @@ function windowResized() {
     scaleX = windowWidth / worldWidth;
     scaleY = windowHeight / worldHeight;
     resizeCanvas(windowWidth, windowHeight);
-  }
+}

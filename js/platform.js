@@ -31,9 +31,9 @@ class Platform {
             text(`${this.num}`, this.body.position.x * scaleX, this.body.position.y * scaleY);
         }
 
-        if (this.passengerReady && this.landingFrame == -1) {
-            fill(color(255, 255, 0));
-            rect((this.body.position.x - 80) * scaleX, (this.body.position.y - this.h / 2 - 70) * scaleY, 70 * scaleX, 140 * scaleY);
+        if (this.passengerReady) {
+            imageMode(CENTER);
+            image(passengerImage, (this.body.position.x - 80) * scaleX, (this.body.position.y - this.h / 2 - 70) * scaleY, 70 * scaleX, 140 * scaleY);
         }
     }
 
@@ -51,13 +51,17 @@ class Platform {
             if (landingUber.fuel < 100) landingUber.fuel += 100 / 3 / gameFrameRate;
             if (landingUber.fuel > 100) landingUber.fuel = 100;
         } else if (this.passengerReady && destination === -1) {
-            if (this.landingFrame === -1) this.landingFrame = frames;
-            else if (frames - this.landingFrame >= gameFrameRate * 2) {
+            if (this.landingFrame === -1) {
+                this.landingFrame = frames;
+                landingUber.loadingPassenger = true;
+            } else if (frames - this.landingFrame >= gameFrameRate * 2) {
                 this.passengerReady = false;
                 passengers--;
                 let platformsCopy = platforms.filter((platform) => platform.num !== 0 && platform !== this);
 
                 destination = random(platformsCopy).num;
+                
+                landingUber.loadingPassenger = false;
 
                 this.landingFrame = -1;
             }

@@ -4,6 +4,7 @@ class Uber {
         this.w = 210;
         this.h = 110;
         this.facingRight = false;
+        this.loadingPassenger = false;
         this.landingMode = true;
         this.movingUp = false;
         this.movingDown = false;
@@ -41,29 +42,29 @@ class Uber {
         this.movingDown = false;
         this.movingForward = false;
         
-        if (this.fuel > 0) {
+        if (this.fuel > 0 && !this.loadingPassenger) {
             if (keyIsDown(LEFT_ARROW) && !this.landingMode) {
                 this.movingForward = true;
                 Matter.Body.setVelocity(this.body, Matter.Vector.add(this.body.velocity, Matter.Vector.create(-0.15, 0)));
                 this.facingRight = false;
                 this.fuel -= fuelConsuptionRate;
-              }
-              if (keyIsDown(RIGHT_ARROW) && !this.landingMode) {
-                this.movingForward = true;
-                Matter.Body.setVelocity(this.body, Matter.Vector.add(this.body.velocity, Matter.Vector.create(0.15, 0)));
-                this.facingRight = true;
-                this.fuel -= fuelConsuptionRate;
-              }
-              if (keyIsDown(UP_ARROW)) {
-                this.movingUp = true;
-                Matter.Body.setVelocity(this.body, Matter.Vector.add(this.body.velocity, Matter.Vector.create(0, -0.2)));
-                this.fuel -= fuelConsuptionRate;
-              }
-              if (keyIsDown(DOWN_ARROW)) {
-                this.movingDown = true;
-                Matter.Body.setVelocity(this.body, Matter.Vector.add(this.body.velocity, Matter.Vector.create(0, 0.15)));
-                this.fuel -= fuelConsuptionRate;
-              }
+            }
+            if (keyIsDown(RIGHT_ARROW) && !this.landingMode) {
+            this.movingForward = true;
+            Matter.Body.setVelocity(this.body, Matter.Vector.add(this.body.velocity, Matter.Vector.create(0.15, 0)));
+            this.facingRight = true;
+            this.fuel -= fuelConsuptionRate;
+            }
+            if (keyIsDown(UP_ARROW)) {
+            this.movingUp = true;
+            Matter.Body.setVelocity(this.body, Matter.Vector.add(this.body.velocity, Matter.Vector.create(0, -0.2)));
+            this.fuel -= fuelConsuptionRate;
+            }
+            if (keyIsDown(DOWN_ARROW)) {
+            this.movingDown = true;
+            Matter.Body.setVelocity(this.body, Matter.Vector.add(this.body.velocity, Matter.Vector.create(0, 0.15)));
+            this.fuel -= fuelConsuptionRate;
+            }
         }
 
         this.lastVelocity = Matter.Body.getVelocity(this.body);
