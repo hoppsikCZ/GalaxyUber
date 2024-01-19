@@ -58,7 +58,7 @@ function setup() {
     addObjectsBodyToEngine(uber);
 
     
-    worldBounds = Matter.Bodies.rectangle(worldWidth / 2, worldHeight / 2, 7600, 4200, { 
+    worldBounds = Matter.Bodies.rectangle(worldWidth / 2, worldHeight / 2 - 100, 7600, 4000, { 
         isStatic: true,
         collisionFilter: {
             group: 0,
@@ -85,10 +85,7 @@ function draw() {
             newPassenger(1);
         }
 
-        if(!Matter.Bounds.contains(worldBounds.bounds, uber.body.vertices[0]) ||
-        !Matter.Bounds.contains(worldBounds.bounds, uber.body.vertices[1]) ||
-        !Matter.Bounds.contains(worldBounds.bounds, uber.body.vertices[2]) ||
-        !Matter.Bounds.contains(worldBounds.bounds, uber.body.vertices[3])) {
+        if(!uber.body.vertices.every((vertex) => Matter.Bounds.contains(worldBounds.bounds, vertex))) {  
             if (nextLevelReady) {
                 nextLevel();
                 return;
@@ -177,7 +174,7 @@ function drawBounds() {
     strokeWeight(5);
     noFill();
     rectMode(CENTER);
-    rect(width / 2, height / 2, 7600 * scaleX, 4200 * scaleY, 10, 10, 10, 10);
+    rect(windowWidth / 2, windowHeight / 2 - 100 * scaleY, (worldBounds.vertices[1].x - worldBounds.vertices[0].x) * scaleX, (worldBounds.vertices[2].y - worldBounds.vertices[1].y) * scaleY, 10, 10, 10, 10);
 }
 
 function nextLevel() {
@@ -226,10 +223,26 @@ function addObjectsBodyToEngine(newObject) {
 }
 
 function randomPlatforms(count, fuel = true) {
+    let platform;
     for (let i = fuel ? 0 : 1; i < count + 1; i++) {
-        let platform = new Platform(round(random(worldWidth - 800) + 400), round(random(worldHeight - 800) + 400), i);
-        platforms.push(platform);
+        for (let j = 0; j < 10; j++) {
+            platform = new Platform(round(random(worldWidth - 800) + 400), round(random(worldHeight - 900) + 400), i);
+            if (platforms.every((element) => isValidLocation(platform.body, element.body, 250, 120))) {
+                platforms.push(platform);
+                break;
+            }
+
+            if (j === 9) console.log("Platform not spawned");
+        }
     }
+}
+
+function isValidLocation(bodyA, bodyB, offsetX, offsetY) {
+    let vertices = Matter.Vertices.create([Matter.Vector.add(bodyB.vertices[0], Matter.Vector.create(-offsetX, -offsetY)), Matter.Vector.add(bodyB.vertices[1], Matter.Vector.create(offsetX, -offsetY)), Matter.Vector.add(bodyB.vertices[2], Matter.Vector.create(offsetX, offsetY)), Matter.Vector.add(bodyB.vertices[3], Matter.Vector.create(-offsetX, offsetY))], bodyB);
+    let tempBounds = Matter.Bounds.create(vertices);
+
+    if (!Matter.Bounds.overlaps(bodyA.bounds, tempBounds)) return true;
+    else return false;
 }
 
 function randomSpawnUber() {
